@@ -1,0 +1,29 @@
+/home/claude/lab3/Lab3/scripts/04_analyze_results.py:136: RuntimeWarning: Mean of empty slice
+  g = df[df.method == m]; vals = [np.nanmean([d.get(p, np.nan) if isinstance(d, dict) else np.nan for d in g.ik_iters_by_phase]) for p in ph]
+method  n  success  success_pct  ci_lo  ci_hi  plan_ms  plan_ms_sd  ik_iters  ik_iters_sd  conv_fail  clr_robot_mm  clr_robot_mean_mm  clr_cube_mm  max_dq  vel_ev  lim_ev  qp_fail  track_mm  place_mm  exec_s
+  Mink 25        0          0.0    0.0  13.32    65.76       10.97     58.60        12.15          0         36.96               65.6        -0.51     1.8       0       0        0       1.5       NaN     NaN
+   DLS 25        0          0.0    0.0  13.32    50.32        8.75     15.12         1.05          0         36.96               65.6        -0.52     1.8       0       0        0       1.5       NaN     NaN
+    QP 25        0          0.0    0.0  13.32    65.92       12.65     58.68        12.23          0         36.96               65.6        -0.51     1.8       0       0        0       1.5       NaN     NaN
+
+failures by reason:
+ failure_reason  collision
+Mink                   25
+DLS                    25
+QP                     25
+
+paired tests:
+        pair  only_first  only_second  p_success  p_time  p_iters
+Mink vs DLS           0            0        1.0  0.0000   0.0000
+ Mink vs QP           0            0        1.0  0.7915   0.1573
+  DLS vs QP           0            0        1.0  0.0000   0.0000
+
+cross-experiment success:
+ method           Mink    DLS     QP
+experiment                         
+main            25/25  25/25  25/25
+stress          16/25  15/25  16/25
+stress_retry4   17/25  16/25  17/25
+lowcarry_noCA    0/25   0/25   0/25
+lowcarry_ca      0/25   3/25   0/25
+lowcarry_smart  25/25  25/25  25/25
+fast            25/25  24/25  25/25

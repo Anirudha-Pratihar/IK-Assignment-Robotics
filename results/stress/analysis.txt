@@ -1,0 +1,27 @@
+method  n  success  success_pct  ci_lo  ci_hi  plan_ms  plan_ms_sd  ik_iters  ik_iters_sd  conv_fail  clr_robot_mm  clr_robot_mean_mm  clr_cube_mm  max_dq  vel_ev  lim_ev  qp_fail  track_mm  place_mm  exec_s
+  Mink 25       16         64.0  44.52  79.75   202.49       54.98    185.80       103.06          9         27.00              57.74        14.09    2.00       0       0        0      1.67      3.42    9.79
+   DLS 25       15         60.0  40.74  76.60   171.75       49.84    137.44       138.54         10         48.72              59.45        17.97   20.21     726     737        0      1.65      3.21    9.95
+    QP 25       16         64.0  44.52  79.75   213.87       52.77    185.76       103.08          9         27.00              57.74        14.09    2.00       0       0        0      1.67      3.42    9.79
+
+failures by reason:
+ failure_reason  ik_infeasible  ik_limits
+Mink                        5          4
+DLS                         6          4
+QP                          5          4
+
+paired tests:
+        pair  only_first  only_second  p_success  p_time  p_iters
+Mink vs DLS           1            0        1.0  0.0018   0.0022
+ Mink vs QP           0            0        1.0  0.0755   0.5637
+  DLS vs QP           0            1        1.0  0.0001   0.0022
+
+cross-experiment success:
+ method           Mink    DLS     QP
+experiment                         
+main            25/25  25/25  25/25
+stress          16/25  15/25  16/25
+stress_retry4   17/25  16/25  17/25
+lowcarry_noCA    0/25   0/25   0/25
+lowcarry_ca      0/25   3/25   0/25
+lowcarry_smart  25/25  25/25  25/25
+fast            25/25  24/25  25/25

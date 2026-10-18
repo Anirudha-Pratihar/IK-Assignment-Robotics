@@ -1,0 +1,12 @@
+numpy
+scipy
+mujoco>=3.2          # MjSpec API (scene assembly) needs a recent release
+mink
+qpsolvers
+daqp                 # default QP backend (pip install daqp); quadprog also works: --set solver=quadprog
+matplotlib
+pandas
+tabulate
+imageio
+imageio-ffmpeg       # mp4 writing for scripts/05_record_video.py
+opencv-python        # optional: text overlay on frames/screenshots

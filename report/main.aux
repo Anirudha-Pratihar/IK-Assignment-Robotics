@@ -1,0 +1,52 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction and goals}{2}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Methods}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Robot, gripper and simulation}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Workspace analysis and table design}{2}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Episodes and pipeline}{2}{subsection.2.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Task (mid) and dexterous (dark) workspace at grasp and carry height, with the designed table, tray and cube-spawn region. The workspace is a ring: the tool-down pose cannot reach close to the base at low height.\relax }}{3}{figure.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:ws}{{1}{3}{Task (mid) and dexterous (dark) workspace at grasp and carry height, with the designed table, tray and cube-spawn region. The workspace is a ring: the tool-down pose cannot reach close to the base at low height.\relax }{figure.caption.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Table design.\relax }}{3}{table.caption.2}\protected@file@percent }
+\newlabel{tab:table}{{1}{3}{Table design.\relax }{table.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}IK methods}{3}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Metrics and protocol}{3}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Results}{3}{section.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Nominal experiment (designed table, 25 episodes, same seeds).\relax }}{4}{table.caption.3}\protected@file@percent }
+\newlabel{tab:main}{{2}{4}{Nominal experiment (designed table, 25 episodes, same seeds).\relax }{table.caption.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Nominal experiment: distribution over 25 episodes of solver time, IK iterations, clearances, peak commanded joint velocity and tracking error.\relax }}{4}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:metrics}{{2}{4}{Nominal experiment: distribution over 25 episodes of solver time, IK iterations, clearances, peak commanded joint velocity and tracking error.\relax }{figure.caption.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Failure analysis and mitigations}{4}{section.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Success (of 25) across experiments. \emph  {stress}: table $2.2\times $ larger (partly unreachable), cubes next to the tray, joint ranges at 55\%; \emph  {retry4}: stress + up to 4 grasp yaws; \emph  {lowcarry}: carry height 7.5\,cm (cube would clip the tray wall) without avoidance / reactive avoidance only / reactive + smart carry height; \emph  {fast}: $v_{cart}{=}0.9$\,m/s, $\dot  q_{\qopname  \relax m{max}}{=}1.5$\,rad/s.\relax }}{5}{table.caption.5}\protected@file@percent }
+\newlabel{tab:exp}{{3}{5}{Success (of 25) across experiments. \emph {stress}: table $2.2\times $ larger (partly unreachable), cubes next to the tray, joint ranges at 55\%; \emph {retry4}: stress + up to 4 grasp yaws; \emph {lowcarry}: carry height 7.5\,cm (cube would clip the tray wall) without avoidance / reactive avoidance only / reactive + smart carry height; \emph {fast}: $v_{cart}{=}0.9$\,m/s, $\dot q_{\max }{=}1.5$\,rad/s.\relax }{table.caption.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Franka Panda 7-DOF, combined set: 25 seeds shared out round-robin (9{}/8{}/8{} episodes), so the comparison is unpaired.\relax }}{5}{table.caption.6}\protected@file@percent }
+\newlabel{tab:franka}{{4}{5}{Franka Panda 7-DOF, combined set: 25 seeds shared out round-robin (\frNMink {}/\frNDLS {}/\frNQP {} episodes), so the comparison is unpaired.\relax }{table.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Representative failures (screenshots taken at the moment of failure).\relax }}{5}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:fail}{{3}{5}{Representative failures (screenshots taken at the moment of failure).\relax }{figure.caption.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion and conclusions}{5}{section.5}\protected@file@percent }
+\bibcite{mujoco}{1}
+\bibcite{mink}{2}
+\bibcite{dls}{3}
+\bibcite{daqp}{4}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Failure reasons in the stress experiment (counts over 25 episodes).\relax }}{6}{table.caption.7}\protected@file@percent }
+\newlabel{tab:fail}{{5}{6}{Failure reasons in the stress experiment (counts over 25 episodes).\relax }{table.caption.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces What each method handles better (supported by the experiments above).\relax }}{6}{table.caption.9}\protected@file@percent }
+\newlabel{tab:disc}{{6}{6}{What each method handles better (supported by the experiments above).\relax }{table.caption.9}{}}
+\gdef \@abspage@last{6}

@@ -1,0 +1,2 @@
+method,episode,seed,cube_x,cube_y,cube_yaw,failure_reason,failure_phase,failure_detail
+dls,17,17,0.45866271477564324,-0.1873322966664291,0.3628196915778523,grasp_slip,place,cube left the gripper

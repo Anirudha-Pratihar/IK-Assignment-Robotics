@@ -1,0 +1,153 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=1.7cm,top=1.6cm,bottom=1.6cm]{geometry}
+\usepackage{graphicx,booktabs,amsmath,amssymb,subcaption,microtype,enumitem,xcolor}
+\usepackage[font=small,labelfont=bf,skip=2pt]{caption}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black,citecolor=blue!50!black]{hyperref}
+\setlist{nosep,leftmargin=1.2em}
+\setlength{\parskip}{2pt}\setlength{\parindent}{0pt}
+\graphicspath{{figures/}}
+\input{numbers}                      % auto-generated macros (scripts/07_make_report_numbers.py)
+\newcommand{\figifexists}[2]{\IfFileExists{figures/#1}{\includegraphics[#2]{figures/#1}}{\fbox{\parbox{0.9\linewidth}{\centering missing: #1}}}}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\title{\vspace{-1.2cm}\textbf{Tutorial 4: Pick and Place in MuJoCo with Inverse Kinematics}\\[2pt]
+\large Off-the-shelf Mink vs.\ closed-loop Damped Least Squares vs.\ constrained QP}
+\author{Anirudha Pratihar (Roll No.\ 26210015) \\ \small Code: \url{https://github.com/Anirudha-Pratihar/IK-Assignment-Robotics} \quad Mink: \url{https://github.com/kevinzakka/mink}}
+\date{}
+\begin{document}\maketitle\vspace{-0.9cm}
+
+\begin{abstract}\noindent
+We build a randomized pick-and-place pipeline for a 6-DOF HEAL arm in MuJoCo (cube $\to$ tray) and compare three differential-IK
+solvers on identical episode seeds: the Mink library, a closed-loop damped-least-squares (DLS) controller, and a custom closed-loop
+quadratic program (QP) with joint-position, velocity and collision constraints. The task and dexterous workspaces are computed by IK
+sampling and used to size the table. On the designed table Mink, DLS and QP reach \mainSuccMink{}, \mainSuccDLS{} and \mainSuccQP{} respectively; the methods differ in cost and, under
+stress, in constraint handling: DLS needs \mainIterDLS{} instead of \mainIterQP{} iterations per episode but violates the
+joint-velocity limit in \fastVelDLS{} control ticks in a fast-motion test, while QP and Mink do not (\fastVelMink{}/\fastVelQP{}).
+\end{abstract}
+
+\section{Introduction and goals}
+The goal is a complete pick-and-place pipeline driven by inverse kinematics (IK): analyse the workspace, design the table, randomize
+the cube pose $(x,y,\psi)$, execute approach--grasp--lift--transit--place, log every success and failure with a reason, and compare
+IK methods under a fixed protocol. Concretely we (i) compute task and dexterous workspaces, (ii) design $L\times W\times H$ of the
+table from them, (iii) run $N{=}25$ randomized episodes per method with identical seeds, (iv) categorise failures and test mitigations,
+and (v) compare Mink, DLS and QP with joint-limit and velocity-violation counts.
+
+\section{Methods}
+\subsection{Robot, gripper and simulation}
+The arm is the 6-DOF HEAL model from the lab folder (base at the origin, on the floor). The raw torque motors are replaced by joint
+position servos ($k_p{=}1500$, $k_d{=}80$) with feed-forward of gravity ($q_{\mathrm{frc,bias}}$) and of the joints' passive damping
+(55\,N\,m\,s/rad), integrated with MuJoCo's implicit-fast integrator ($\Delta t{=}2$\,ms). A parallel-jaw gripper is attached at the
+flange site; the TCP is the pad centre. Grasping is physical (friction, elliptic cones): the cube (4\,cm, 50\,g, $\mu{=}1.2$) is held by pad
+contact only. \todo{state which gripper produced the final results: Robotiq 2F-85 or the built-in fallback (the reference runs here used the fallback with the same interface)}
+
+\textbf{Franka Panda (7-DOF).} The same code runs on the Franka Panda with its built-in two-finger hand (kept servos; stiffer finger gain). The arm is redundant, so every solver gets a null-space
+posture term towards the ready pose (DLS: null-space projector; QP: posture term in the cost; Mink: low-cost \texttt{PostureTask}). The base is mounted 0.8\,m above the floor, so the workspace analysis is
+repeated for this robot (table: $H{=}\frH$\,m, $L{\times}W{=}\frL{\times}\frW$\,m).
+
+\subsection{Workspace analysis and table design}
+For each TCP position on a grid (5\,cm) and several heights we solve IK for a \emph{top-down} gripper pose.
+\textbf{Task workspace}: positions reachable for at least one yaw. \textbf{Dexterous workspace}: positions reachable for \emph{all} sampled
+yaws in $[-\pi,\pi)$ (continuation over yaw, joint limits enforced, kinematics only). For each candidate height $H$ the masks at the
+grasp ($H{+}3$\,cm), pre-grasp and carry heights are intersected, and the largest all-feasible rectangle (histogram method) defines
+$L\times W$; the $H$ with the largest area wins (Fig.~\ref{fig:ws}, Tab.~\ref{tab:table}). The tray sits on the table; the cube
+spawns in the remaining area with a margin to the tray.
+\begin{figure}[t]\centering\figifexists{workspace_table_design.png}{width=0.88\linewidth}
+\caption{Task (mid) and dexterous (dark) workspace at grasp and carry height, with the designed table, tray and cube-spawn region.
+The workspace is a ring: the tool-down pose cannot reach close to the base at low height.}\label{fig:ws}\end{figure}
+\begin{table}[t]\centering\small\caption{Table design.}\label{tab:table}\input{tables/table_design}\end{table}
+
+\subsection{Episodes and pipeline}
+Seed $s$ gives cube $(x,y)$ uniform in the spawn region and $\psi\sim U[-\pi,\pi]$, \emph{identically for every method}.
+The square cube allows four grasp yaws $\psi{+}k\pi/2$; the one closest to the current tool yaw is tried first, and the planner can fall back to the
+others (\texttt{grasp\_yaw\_retries}). Phases: \emph{approach} (above cube) $\to$ \emph{descend} $\to$ close $\to$ \emph{lift} $\to$ \emph{transit}
+(above tray) $\to$ \emph{place} $\to$ open $\to$ \emph{retreat} $\to$ verify (cube inside the tray and at rest). Each phase is a straight TCP line with
+minimum-jerk timing, tracked by the chosen IK method on a private copy of the model (Planner), and replayed by the servo in the physics simulation
+(Controller); the Env/Planner/Controller split matches the tutorial's sequence diagram. Approach and descend are dry-run first so alternative yaws can be tried.
+
+\subsection{IK methods}
+All three share the same closed-loop task law: each tick ($\Delta t{=}20$\,ms) they close a fraction $\kappa{=}0.8$ of the 6-D pose error,
+$v^\star=\kappa\,e/\Delta t$, so differences come from the solver, not the gain.
+\begin{itemize}
+\item \textbf{DLS:} $\dot q = J^\top (JJ^\top+\lambda^2 I)^{-1} v^\star$, $\lambda{=}0.03$ with adaptive growth near $\sigma_{\min}(J)\to0$. Limits: position clipping only;
+collision: potential-field repulsion along contact normals, active within a per-group band above the keep-out distance.
+\item \textbf{QP:} $\min_{\dot q}\ \tfrac12\|J\dot q-v^\star\|^2+\tfrac{\mu}{2}\|\dot q\|^2$ s.t.
+$\max(-\dot q_{\max},\tfrac{q_{\min}-q}{\Delta t})\le\dot q\le\min(\dot q_{\max},\tfrac{q_{\max}-q}{\Delta t})$ and, for every geom pair closer than 6\,cm,
+$d+\mathbf n^\top(J_2-J_1)\dot q\,\Delta t\ge d_{\min}$ (signed distance from \texttt{mj\_geomDistance}); solved with DAQP.
+\item \textbf{Mink:} \texttt{FrameTask} on the TCP with \texttt{ConfigurationLimit}, \texttt{VelocityLimit} and one \texttt{CollisionAvoidanceLimit} per geom group.
+Mink is the off-the-shelf baseline; it solves essentially the same QP as ours (same bounds, same distance constraints), differing in how the task and limits are assembled.
+\end{itemize}
+\textbf{Collision handling} covers arm and hand versus table and tray, pads versus cube (pre-grasp), and a cube-sized geom welded to the hand versus the tray and table while carrying.
+\textbf{Smart carry height:} independently of the reactive constraints, the planner lifts to at least $h_{\text{wall}}+c+h_{\text{grasp}}$ so the carried cube passes above the tray wall.
+
+\subsection{Metrics and protocol}
+Per episode we log: success, failure reason and phase, solver time (wall time inside the IK solvers), IK iterations (sum over waypoints of the iterations a fixed-target solve
+needs to converge), minimum signed clearance (arm/hand vs.\ table+tray, and cube vs.\ tray while carrying), joint-limit events (raw update left the range), velocity events
+($|\dot q|>\dot q_{\max}{=}2$\,rad/s unless stated), TCP tracking error and placement error. Success rates carry Wilson 95\% intervals; since seeds are shared, methods are compared with paired tests
+(exact McNemar for success, Wilcoxon signed-rank for continuous metrics). For the combined Franka set each seed is run by only one method, so Fisher's exact test and Mann--Whitney $U$ are used instead.
+
+\section{Results}
+\begin{table}[t]\centering\small\caption{Nominal experiment (designed table, 25 episodes, same seeds).}\label{tab:main}
+\resizebox{\linewidth}{!}{\input{tables/main_summary}}\\[3pt]
+\resizebox{0.72\linewidth}{!}{\input{tables/main_tests}}\end{table}
+\textbf{Nominal.} Success is \mainSuccMink{}, \mainSuccDLS{}, \mainSuccQP{} (Mink, DLS, QP; Tab.~\ref{tab:main}); solve times are \mainMsMink{}/\mainMsDLS{}/\mainMsQP{}\,ms (Mink/DLS/QP) per episode and
+IK iterations \mainIterMink{}/\mainIterDLS{}/\mainIterQP{}. DLS converges in fewer iterations because it has no velocity bound, whereas Mink and QP are limited to
+$\dot q_{\max}$; the paired tests confirm DLS differs significantly from QP in time and iterations while Mink and QP are statistically indistinguishable (same optimisation problem).
+Minimum arm clearance is \mainClrRMink{}\,mm and cube--tray clearance \mainClrCMink{}\,mm for all methods; placement error is \mainPlaceMink{}\,mm.
+
+\begin{figure}[t]\centering\figifexists{main_metrics.png}{width=0.93\linewidth}
+\caption{Nominal experiment: distribution over 25 episodes of solver time, IK iterations, clearances, peak commanded joint velocity and tracking error.}\label{fig:metrics}\end{figure}
+
+\begin{table}[t]\centering\small\caption{Success (of 25) across experiments. \emph{stress}: table $2.2\times$ larger (partly unreachable), cubes next to the tray, joint ranges at 55\%;
+\emph{retry4}: stress + up to 4 grasp yaws; \emph{lowcarry}: carry height 7.5\,cm (cube would clip the tray wall) without avoidance / reactive avoidance only / reactive + smart carry height;
+\emph{fast}: $v_{cart}{=}0.9$\,m/s, $\dot q_{\max}{=}1.5$\,rad/s.}\label{tab:exp}\input{tables/experiments}\end{table}
+
+\textbf{Stress and constraints.} Under stress (Tab.~\ref{tab:exp}) success drops to \stressSuccMink{}, \stressSuccDLS{}, \stressSuccQP{} (Mink, DLS, QP). In this run DLS reports \stressLimDLS{} joint-limit events and
+\stressVelDLS{} velocity violations, while Mink and QP report none because both are enforced inside the QP. In the fast-motion test DLS commands up to \fastMaxDqDLS{}\,rad/s
+(limit 1.5) in \fastVelDLS{} ticks and loses one cube in transit; Mink/QP stay at the limit but pay with a larger tracking error (\fastTrackQP{}\,mm vs.\ \fastTrackDLS{}\,mm) and
+placement error (\fastPlaceQP{}\,mm).
+
+\begin{table}[t]\centering\small\caption{Franka Panda 7-DOF, combined set: 25 seeds shared out round-robin (\frNMink{}/\frNDLS{}/\frNQP{} episodes), so the comparison is unpaired.}\label{tab:franka}
+\resizebox{\linewidth}{!}{\input{tables/franka_main_summary}}\\[3pt]\resizebox{0.72\linewidth}{!}{\input{tables/franka_main_tests}}\end{table}
+\textbf{Franka Panda (combined 25 episodes).} Success is \frSuccMink{}, \frSuccDLS{}, \frSuccQP{} (Mink, DLS, QP; Tab.~\ref{tab:franka}). The cost pattern matches the HEAL arm: DLS needs \frIterDLS{} IK iterations against
+\frIterMink{} (Mink) and \frIterQP{} (QP) because it has no velocity bound, with solve times \frMsMink{}/\frMsDLS{}/\frMsQP{}\,ms; clearances (\frClrRMink{}\,mm arm, \frClrCMink{}\,mm cube--tray) and placement error (\frPlaceMink{}\,mm) are
+equal across methods. With only 8--9 episodes per method, success rates cannot be separated (Wilson 95\% lower bound about 68\%); the remaining \frRemMink{}/\frRemDLS{}/\frRemQP{} episodes complete 25 per method and make the comparison paired.
+
+\section{Failure analysis and mitigations}
+\begin{table}[t]\centering\small\caption{Failure reasons in the stress experiment (counts over 25 episodes).}\label{tab:fail}\input{tables/stress_failures}\end{table}
+\begin{figure}[!t]\centering
+\begin{subfigure}{0.48\linewidth}\figifexists{fail_stress_qp_ep4_ik_infeasible_approach.png}{width=\linewidth}\caption{Unreachable pre-grasp (cube too far).}\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}\figifexists{fail_stress_qp_ep12_ik_limits_transit.png}{width=\linewidth}\caption{Joint limit reached during transit.}\end{subfigure}\\[3pt]
+\begin{subfigure}{0.48\linewidth}\figifexists{fail_lowcarry_ca_mink_ep0_ik_infeasible_transit.png}{width=\linewidth}\caption{Reactive avoidance only: stalls before the tray wall.}\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}\figifexists{fail_fast_dls_ep17_grasp_slip_place.png}{width=\linewidth}\caption{DLS, fast motion: cube slips out.}\end{subfigure}
+\caption{Representative failures (screenshots taken at the moment of failure).}\label{fig:fail}\end{figure}
+
+\textbf{Categories.} (1) \emph{IK infeasible / limits}: the dominant failure under stress; the cube lies outside the dexterous region (Fig.~\ref{fig:fail}a,b), so no method can succeed and the failure sets of the three methods are nearly identical.
+(2) \emph{Collision}: without avoidance every episode with the low carry height clips the tray wall (\lcNoCASuccMink{} success); with reactive constraints only, Mink and QP avoid the wall (min.\ cube--tray clearance \lcCAClrCQP{}\,mm) but
+stall in front of it (\lcCASuccQP{} success, Fig.~\ref{fig:fail}c) because a local constraint cannot choose to go \emph{over} the wall, and DLS's repulsion is too weak (\lcCASuccDLS{}, collisions).
+(3) \emph{Grasp slip}: caused by aggressive velocities (Fig.~\ref{fig:fail}d). (4) \emph{Place miss / grasp miss}: none occurred in the nominal runs.
+
+\textbf{Mitigations tested.} \emph{Alternate grasp yaw} raises stress success from \stressSuccMink{}, \stressSuccDLS{}, \stressSuccQP{} to \retrySuccMink{}, \retrySuccDLS{}, \retrySuccQP{} at a higher solve time (\stressMsMink{}\,$\to$\,\retryMsMink{}\,ms for Mink); the gain is small because the remaining failures are all at joint limits or out of reach, which a different wrist yaw cannot always fix.
+\emph{Geometry-aware carry height} combined with reactive constraints gives \lcSmartSuccMink{}, \lcSmartSuccDLS{}, \lcSmartSuccQP{} (Mink, DLS, QP) in the same low-carry setting. Further options: better pre-grasp heights,
+a different approach direction, larger collision margins, a table placed inside the dexterous region (Sec.~2.2).
+
+\section{Discussion and conclusions}
+\begin{table}[!t]\centering\small\caption{What each method handles better (supported by the experiments above).}\label{tab:disc}
+\begin{tabular}{p{1.9cm}p{4.7cm}p{4.6cm}p{4.6cm}}\toprule
+ & Strengths & Weaknesses & Evidence\\\midrule
+Mink & fast to integrate; limits and collision built in; same behaviour as our QP & less control over constraint formulation; extra dependency; tunable gain semantics (per-step fraction) & identical outcomes to QP in every experiment\\
+DLS & simplest; fewest iterations; robust near singularities & no velocity/limit guarantee; repulsion needs per-group tuning and was insufficient for the tray wall & \fastVelDLS{} velocity violations (fast); \lcCASuccDLS{} (low carry, CA only)\\
+QP & constraints enforced exactly (position, velocity, distance); graceful on infeasible targets & needs a solver; solve time higher; reactive only---cannot plan around obstacles & no velocity/limit events in our runs (\fastVelQP{} in the fast test); stalls at the wall without smart carry height\\\bottomrule
+\end{tabular}\end{table}
+Constraint handling, not success rate, separates the methods on this task: on a well-designed table all three succeed, and under stress the dominant failures (unreachable cubes) are
+workspace-limited and shared by every solver; the workspace analysis and the table design therefore matter more than the choice of IK method. Where the methods do differ, QP/Mink guarantee
+limits and velocity bounds and DLS does not, at the price of more iterations and solver time. Reactive collision constraints are necessary  but not sufficient;
+they must be combined with geometry-aware waypoints (here: without them, \lcNoCASuccMink{} succeed at the low carry height). \textbf{Limitations:} 25 episodes per cell give wide intervals (Wilson 95\% ${\approx}$ 87--100\% at 25/25); IK planning is kinematic
+and replayed through a servo; collisions are checked on collision meshes only; results depend on the gripper model. \todo{add observations from your own video trials and final gripper}
+
+\begin{thebibliography}{9}\small
+\bibitem{mujoco} E.~Todorov, T.~Erez, Y.~Tassa. MuJoCo: a physics engine for model-based control. IROS 2012.
+\bibitem{mink} K.~Zakka. \emph{mink}: differential inverse kinematics in MuJoCo. \url{https://github.com/kevinzakka/mink}.
+\bibitem{dls} Y.~Nakamura, H.~Hanafusa. Inverse kinematic solutions with singularity robustness. J.~Dyn.\ Syst.\ Meas.\ Control, 1986.
+\bibitem{daqp} D.~Arnström et al. A dual active-set solver for embedded QP (DAQP). IEEE TAC, 2022.
+\end{thebibliography}
+\end{document}
